@@ -22,8 +22,8 @@ contract RSP {
         secondPlayerWon
     }
 
-    address payable public firstPlayer;
-    address payable public secondPlayer;
+    address public firstPlayer;
+    address public secondPlayer;
 
     bool private firstPlayerPaid;
     bool private secondPlayerPaid;
@@ -40,8 +40,8 @@ contract RSP {
     GameResult public gameResult;
 
     constructor() {
-        firstPlayer = payable(msg.sender);
-        secondPlayer = payable(address(0x0));
+        firstPlayer = msg.sender;
+        secondPlayer = address(0x0);
         firstPlayerPaid = false;
         secondPlayerPaid = false;
         gameBet = 0;
@@ -66,7 +66,7 @@ contract RSP {
     function participate(bytes32 commit) external payable 
         forGameState(GameState.waitingSecondPlayer) needBet notAPlayer {
         
-        secondPlayer = payable(msg.sender);
+        secondPlayer = msg.sender;
         secondPlayerCommit = commit;
         gameState = GameState.revealing;
         emit SecondPlayerParticipated(msg.sender);
@@ -96,8 +96,8 @@ contract RSP {
     // Прерывает игру, возвращая средства. Вдруг на стадии открытия кто-то ушел
     function breakGame() external forGameState(GameState.revealing) anyPlayer {
         gameState = GameState.paid;
-        (firstPlayerPaid, ) = firstPlayer.call{value: gameBet}("");
-        (secondPlayerPaid, ) = secondPlayer.call{value: gameBet}("");
+        (firstPlayerPaid, ) = payable(firstPlayer).call{value: gameBet}("");
+        (secondPlayerPaid, ) = payable(secondPlayer).call{value: gameBet}("");
         emit GameBroken();
     }
 
@@ -105,21 +105,21 @@ contract RSP {
         uint gameReusltValue = (3 + secondPlayerChoice - firstPlayerChoice) % 3;
         gameResult = GameResult(gameReusltValue);
         if (gameResult == GameResult.firstPlayerWon) {
-            (bool success, ) = firstPlayer.call{value: gameBet * 2}("");
+            (bool success, ) = payable(firstPlayer).call{value: gameBet * 2}("");
             require (success, "Error transfering");
             gameState = GameState.paid;
             emit GamePaid(gameResult);
         } else if (gameResult == GameResult.secondPlayerWon) {
-            (bool success, ) = secondPlayer.call{value: gameBet * 2}("");
+            (bool success, ) = payable(secondPlayer).call{value: gameBet * 2}("");
             require (success, "Error transfering");
             gameState = GameState.paid;
             emit GamePaid(gameResult);
         } else if (gameResult == GameResult.draw) {
             if (!firstPlayerPaid) {
-                (firstPlayerPaid, ) = firstPlayer.call{value: gameBet}("");
+                (firstPlayerPaid, ) = payable(firstPlayer).call{value: gameBet}("");
             }
             if (!secondPlayerPaid) {
-                (secondPlayerPaid, ) = secondPlayer.call{value: gameBet}("");
+                (secondPlayerPaid, ) = payable(secondPlayer).call{value: gameBet}("");
             }
             require (firstPlayerPaid && secondPlayerPaid, "Error transfering");
             gameState = GameState.paid;
