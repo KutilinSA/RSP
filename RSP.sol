@@ -1,6 +1,13 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 contract RSP {
+    event GameStarted(address initiator, uint bet);
+    event SecondPlayerParticipated(address secondPlayer);
+    event RevealedChoice(address player, uint choice);
+    event GameEnded();
+    event GameBroken();
+    event GamePaid(GameResult result);
+
     enum GameState {
         notStarted,
         waitingSecondPlayer,
@@ -53,6 +60,7 @@ contract RSP {
         gameBet = msg.value;
         firstPlayerCommit = commit;
         gameState = GameState.waitingSecondPlayer;
+        emit GameStarted(firstPlayer, gameBet);
     }
 
     function participate(bytes32 commit) external payable 
@@ -61,6 +69,7 @@ contract RSP {
         secondPlayer = payable(msg.sender);
         secondPlayerCommit = commit;
         gameState = GameState.revealing;
+        emit SecondPlayerParticipated(msg.sender);
     }
 
     // Salt по идее должен быть bytes32, но у Remix проблемы с передачей bytes32
@@ -71,12 +80,15 @@ contract RSP {
         if (msg.sender == firstPlayer) {
             require (firstPlayerCommit == hash, "You are trying to lie");
             firstPlayerChoice = choice;
+            emit RevealedChoice(firstPlayer, choice);
         } else if (msg.sender == secondPlayer) {
             require (secondPlayerCommit == hash, "You are trying to lie");
             secondPlayerChoice = choice;
+            emit RevealedChoice(secondPlayer, choice);
         }
 
         if (firstPlayerChoice != 0 && secondPlayerChoice != 0) {
+            emit GameEnded();
             gameState = GameState.ended;
         }
     }
@@ -86,6 +98,7 @@ contract RSP {
         gameState = GameState.paid;
         (firstPlayerPaid, ) = firstPlayer.call{value: gameBet}("");
         (secondPlayerPaid, ) = secondPlayer.call{value: gameBet}("");
+        emit GameBroken();
     }
 
     function endGame() external forGameState(GameState.ended) {
@@ -95,10 +108,12 @@ contract RSP {
             (bool success, ) = firstPlayer.call{value: gameBet * 2}("");
             require (success, "Error transfering");
             gameState = GameState.paid;
+            emit GamePaid(gameResult);
         } else if (gameResult == GameResult.secondPlayerWon) {
             (bool success, ) = secondPlayer.call{value: gameBet * 2}("");
             require (success, "Error transfering");
             gameState = GameState.paid;
+            emit GamePaid(gameResult);
         } else if (gameResult == GameResult.draw) {
             if (!firstPlayerPaid) {
                 (firstPlayerPaid, ) = firstPlayer.call{value: gameBet}("");
@@ -108,6 +123,7 @@ contract RSP {
             }
             require (firstPlayerPaid && secondPlayerPaid, "Error transfering");
             gameState = GameState.paid;
+            emit GamePaid(gameResult);
         }
     }
 
